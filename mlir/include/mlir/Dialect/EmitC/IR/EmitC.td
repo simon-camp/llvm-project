@@ -27,6 +27,25 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 class EmitC_Op<string mnemonic, list<Trait> traits = []>
     : Op<EmitC_Dialect, mnemonic, traits>;
 
+def EmitC_AddOp : EmitC_Op<"add", [Commutative]> {
+  let summary = "Addition operation";
+  let description = [{
+    With the `add` operation the arithmetic operator + (addition) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    %0 = emitc.add %arg0, %arg1 : (i32, i32) -> i32
+    %1 = emitc.add %arg2, %arg3 : (!emitc.ptr<f32>, i32) -> !emitc.ptr
+    ```
+  }];
+  let arguments = (ins AnyType:$lhs, AnyType:$rhs);
+  let results = (outs AnyType);
+
+  let hasVerifier = 1;
+}
+
 def EmitC_ApplyOp : EmitC_Op<"apply", []> {
   let summary = "Apply operation";
   let description = [{
@@ -173,6 +192,27 @@ def EmitC_IncludeOp
     UnitAttr:$is_standard_include
   );
   let hasCustomAssemblyFormat = 1;
+}
+
+def EmitC_SubOp : EmitC_Op<"sub", []> {
+  let summary = "Subtraction operation";
+  let description = [{
+    With the `sub` operation the arithmetic operator - (subtraction) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    %0 = emitc.sub %arg0, %arg1 : (i32, i32) -> i32
+    %1 = emitc.sub %arg2, %arg3 : (!emitc.ptr<f32>, i32) -> !emitc.ptr
+    %2 = emitc.sub %arg4, %arg5 : (!emitc.ptr<i32>, !emitc.ptr<i32>)
+        -> !emitc.opaque<"ptrdiff_t">
+    ```
+  }];
+  let arguments = (ins AnyType:$lhs, AnyType:$rhs);
+  let results = (outs AnyType);
+
+  let hasVerifier = 1;
 }
 
 def EmitC_VariableOp : EmitC_Op<"variable", []> {

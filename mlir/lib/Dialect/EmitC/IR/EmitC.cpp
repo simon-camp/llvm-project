@@ -45,6 +45,25 @@ Operation *EmitCDialect::materializeConstant(OpBuilder &builder,
 }
 
 //===----------------------------------------------------------------------===//
+// AddOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult AddOp::verify() {
+  if (getLhs().getType().isa<emitc::PointerType>() &&
+      getRhs().getType().isa<emitc::PointerType>())
+    return emitOpError("requires that at most one operand is a pointer");
+
+  if ((getLhs().getType().isa<emitc::PointerType>() &&
+       !getRhs().getType().isa<IntegerType, emitc::OpaqueType>()) ||
+      (getRhs().getType().isa<emitc::PointerType>() &&
+       !getLhs().getType().isa<IntegerType, emitc::OpaqueType>()))
+    return emitOpError("requires that one operand is an integer or of opaque "
+                       "type if the other is a pointer");
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // ApplyOp
 //===----------------------------------------------------------------------===//
 
@@ -173,6 +192,25 @@ ParseResult IncludeOp::parse(OpAsmParser &parser, OperationState &result) {
   if (standardInclude)
     result.addAttribute("is_standard_include",
                         UnitAttr::get(parser.getContext()));
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// SubOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult SubOp::verify() {
+  if (getRhs().getType().isa<emitc::PointerType>() &&
+      !getLhs().getType().isa<emitc::PointerType>())
+    return emitOpError("rhs can only be a pointer if lhs is a pointer");
+
+  if (getLhs().getType().isa<emitc::PointerType>() &&
+      !getRhs()
+           .getType()
+           .isa<IntegerType, emitc::OpaqueType, emitc::PointerType>())
+    return emitOpError("requires that rhs is an integer, pointer or of opaque "
+                       "type if lhs is a pointer");
 
   return success();
 }
