@@ -246,7 +246,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
   return printConstantOp(emitter, operation, value);
 }
 
-static LogicalResult printBinaryArithOperation(CppEmitter &emitter,
+static LogicalResult printBinaryOperation(CppEmitter &emitter,
                                                Operation *operation,
                                                StringRef binaryArithOperator) {
   raw_ostream &os = emitter.ostream();
@@ -263,25 +263,61 @@ static LogicalResult printBinaryArithOperation(CppEmitter &emitter,
 static LogicalResult printOperation(CppEmitter &emitter, emitc::AddOp addOp) {
   Operation *operation = addOp.getOperation();
 
-  return printBinaryArithOperation(emitter, operation, "+");
+  return printBinaryOperation(emitter, operation, "+");
 }
 
 static LogicalResult printOperation(CppEmitter &emitter, emitc::SubOp subOp) {
   Operation *operation = subOp.getOperation();
 
-  return printBinaryArithOperation(emitter, operation, "-");
+  return printBinaryOperation(emitter, operation, "-");
 }
 
 static LogicalResult printOperation(CppEmitter &emitter, emitc::MulOp mulOp) {
   Operation *operation = mulOp.getOperation();
 
-  return printBinaryArithOperation(emitter, operation, "*");
+  return printBinaryOperation(emitter, operation, "*");
 }
 
 static LogicalResult printOperation(CppEmitter &emitter, emitc::DivOp divOp) {
   Operation *operation = divOp.getOperation();
 
-  return printBinaryArithOperation(emitter, operation, "/");
+  return printBinaryOperation(emitter, operation, "/");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, emitc::EqOp eqOp) {
+  Operation *operation = eqOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, "==");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, emitc::NeOp neOp) {
+  Operation *operation = neOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, "!=");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, emitc::LtOp ltOp) {
+  Operation *operation = ltOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, "<");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, emitc::GtOp gtOp) {
+  Operation *operation = gtOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, ">");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, emitc::LeOp leOp) {
+  Operation *operation = leOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, "<=");
+}
+
+static LogicalResult printOperation(CppEmitter &emitter, emitc::GeOp geOp) {
+  Operation *operation = geOp.getOperation();
+
+  return printBinaryOperation(emitter, operation, ">=");
 }
 
 static LogicalResult printOperation(CppEmitter &emitter,
@@ -973,8 +1009,9 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
               [&](auto op) { return printOperation(*this, op); })
           // EmitC ops.
           .Case<emitc::AddOp, emitc::ApplyOp, emitc::CallOp, emitc::CastOp,
-                emitc::ConstantOp, emitc::DivOp, emitc::IncludeOp, emitc::MulOp,
-                emitc::SubOp, emitc::VariableOp>(
+                emitc::ConstantOp, emitc::DivOp, emitc::EqOp, emitc::GeOp,
+                emitc::GtOp, emitc::IncludeOp, emitc::LeOp, emitc::LtOp,
+                emitc::MulOp, emitc::NeOp, emitc::SubOp, emitc::VariableOp>(
               [&](auto op) { return printOperation(*this, op); })
           // Func ops.
           .Case<func::CallOp, func::ConstantOp, func::FuncOp, func::ReturnOp>(

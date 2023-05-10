@@ -28,7 +28,7 @@ class EmitC_Op<string mnemonic, list<Trait> traits = []>
     : Op<EmitC_Dialect, mnemonic, traits>;
 
 // Base class for binary operations.
-class EmitC_BinaryArithOp<string mnemonic, list<Trait> traits = []> :
+class EmitC_BinaryOp<string mnemonic, list<Trait> traits = []> :
     EmitC_Op<mnemonic, traits> {
   let arguments = (ins AnyType:$lhs, AnyType:$rhs);
   let results = (outs AnyType);
@@ -37,7 +37,7 @@ class EmitC_BinaryArithOp<string mnemonic, list<Trait> traits = []> :
   let hasVerifier = 1;
 }
 
-def EmitC_AddOp : EmitC_BinaryArithOp<"add", [Commutative]> {
+def EmitC_AddOp : EmitC_BinaryOp<"add", [Commutative]> {
   let summary = "Addition operation";
   let description = [{
     With the `add` operation the arithmetic operator + (addition) can
@@ -175,7 +175,7 @@ def EmitC_ConstantOp : EmitC_Op<"constant", [ConstantLike]> {
   let hasVerifier = 1;
 }
 
-def EmitC_DivOp : EmitC_BinaryArithOp<"div", []> {
+def EmitC_DivOp : EmitC_BinaryOp<"div", []> {
   let summary = "Division operation";
   let description = [{
     With the `div` operation the arithmetic operator / (division) can
@@ -191,6 +191,66 @@ def EmitC_DivOp : EmitC_BinaryArithOp<"div", []> {
     // Generic form of the same operations.
     %0 = "emitc.div" (%arg0, %arg1) : (i32, i32) -> i32
     %0 = "emitc.div" (%arg2, %arg3) : (f64, f64) -> f64
+    ```
+  }];
+}
+
+def EmitC_EqOp : EmitC_BinaryOp<"eq", []> {
+  let summary = "Equal-to operation";
+  let description = [{
+    With the `eq` operation the arithmetic operator == (equal to) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the equal-to operation.
+    %0 = emitc.eq %arg0, %arg1 : (i32, i32) -> i1
+    %0 = emitc.eq %arg2, %arg3 : (f64, f64) -> i1
+
+    // Generic form of the same operations.
+    %0 = "emitc.eq" (%arg0, %arg1) : (i32, i32) -> i1
+    %0 = "emitc.eq" (%arg2, %arg3) : (f64, f64) -> i1
+    ```
+  }];
+}
+
+def EmitC_GeOp : EmitC_BinaryOp<"ge", []> {
+  let summary = "Greater-than-or-equal-to operation";
+  let description = [{
+    With the `ge` operation the arithmetic operator >= (greater than or equal to) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the greater-than-or-equal-to operation.
+    %0 = emitc.ge %arg0, %arg1 : (i32, i32) -> i1
+    %0 = emitc.ge %arg2, %arg3 : (f64, f64) -> i1
+
+    // Generic form of the same operations.
+    %0 = "emitc.ge" (%arg0, %arg1) : (i32, i32) -> i1
+    %0 = "emitc.ge" (%arg2, %arg3) : (f64, f64) -> i1
+    ```
+  }];
+}
+
+def EmitC_GtOp : EmitC_BinaryOp<"gt", []> {
+  let summary = "Greater-than operation";
+  let description = [{
+    With the `gt` operation the arithmetic operator > (greater than) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the greater-than operation.
+    %0 = emitc.gt %arg0, %arg1 : (i32, i32) -> i1
+    %0 = emitc.gt %arg2, %arg3 : (f64, f64) -> i1
+
+    // Generic form of the same operations.
+    %0 = "emitc.gt" (%arg0, %arg1) : (i32, i32) -> i1
+    %0 = "emitc.gt" (%arg2, %arg3) : (f64, f64) -> i1
     ```
   }];
 }
@@ -225,7 +285,47 @@ def EmitC_IncludeOp
   let hasCustomAssemblyFormat = 1;
 }
 
-def EmitC_MulOp : EmitC_BinaryArithOp<"mul", [Commutative]> {
+def EmitC_LeOp : EmitC_BinaryOp<"le", []> {
+  let summary = "Less-than-or-equal-to operation";
+  let description = [{
+    With the `le` operation the arithmetic operator <= (less than or equal to) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the less-than-or-equal-to operation.
+    %0 = emitc.le %arg0, %arg1 : (i32, i32) -> i1
+    %0 = emitc.le %arg2, %arg3 : (f64, f64) -> i1
+
+    // Generic form of the same operations.
+    %0 = "emitc.le" (%arg0, %arg1) : (i32, i32) -> i1
+    %0 = "emitc.le" (%arg2, %arg3) : (f64, f64) -> i1
+    ```
+  }];
+}
+
+def EmitC_LtOp : EmitC_BinaryOp<"lt", []> {
+  let summary = "Less-than operation";
+  let description = [{
+    With the `lt` operation the arithmetic operator < (less than) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the less-than operation.
+    %0 = emitc.lt %arg0, %arg1 : (i32, i32) -> i1
+    %0 = emitc.lt %arg2, %arg3 : (f64, f64) -> i1
+
+    // Generic form of the same operations.
+    %0 = "emitc.lt" (%arg0, %arg1) : (i32, i32) -> i1
+    %0 = "emitc.lt" (%arg2, %arg3) : (f64, f64) -> i1
+    ```
+  }];
+}
+
+def EmitC_MulOp : EmitC_BinaryOp<"mul", [Commutative]> {
   let summary = "Multiplication operation";
   let description = [{
     With the `,ul` operation the arithmetic operator * (Multiplication) can
@@ -234,7 +334,7 @@ def EmitC_MulOp : EmitC_BinaryArithOp<"mul", [Commutative]> {
     Example:
 
     ```mlir
-    // Custom form of the division operation.
+    // Custom form of the multiplication operation.
     %0 = emitc.mul %arg0, %arg1 : (i32, i32) -> i32
     %0 = emitc.mul %arg2, %arg3 : (f64, f64) -> f64
 
@@ -245,7 +345,27 @@ def EmitC_MulOp : EmitC_BinaryArithOp<"mul", [Commutative]> {
   }];
 }
 
-def EmitC_SubOp : EmitC_BinaryArithOp<"sub", []> {
+def EmitC_NeOp : EmitC_BinaryOp<"ne", []> {
+  let summary = "Not-equal-to operation";
+  let description = [{
+    With the `ne` operation the arithmetic operator != (not equal to) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the not-equal-to operation.
+    %0 = emitc.ne %arg0, %arg1 : (i32, i32) -> i1
+    %0 = emitc.ne %arg2, %arg3 : (f64, f64) -> i1
+
+    // Generic form of the same operations.
+    %0 = "emitc.ne" (%arg0, %arg1) : (i32, i32) -> i1
+    %0 = "emitc.ne" (%arg2, %arg3) : (f64, f64) -> i1
+    ```
+  }];
+}
+
+def EmitC_SubOp : EmitC_BinaryOp<"sub", []> {
   let summary = "Subtraction operation";
   let description = [{
     With the `sub` operation the arithmetic operator - (subtraction) can
