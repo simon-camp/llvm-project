@@ -164,6 +164,14 @@ OpFoldResult emitc::ConstantOp::fold(FoldAdaptor adaptor) {
 }
 
 //===----------------------------------------------------------------------===//
+// DivOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult DivOp::verify() {
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // IncludeOp
 //===----------------------------------------------------------------------===//
 
@@ -195,6 +203,14 @@ ParseResult IncludeOp::parse(OpAsmParser &parser, OperationState &result) {
     result.addAttribute("is_standard_include",
                         UnitAttr::get(parser.getContext()));
 
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MulOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult MulOp::verify() {
   return success();
 }
 

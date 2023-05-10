@@ -27,7 +27,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 class EmitC_Op<string mnemonic, list<Trait> traits = []>
     : Op<EmitC_Dialect, mnemonic, traits>;
 
-// Base class for binary arithmetic operations.
+// Base class for binary operations.
 class EmitC_BinaryArithOp<string mnemonic, list<Trait> traits = []> :
     EmitC_Op<mnemonic, traits> {
   let arguments = (ins AnyType:$lhs, AnyType:$rhs);
@@ -175,6 +175,26 @@ def EmitC_ConstantOp : EmitC_Op<"constant", [ConstantLike]> {
   let hasVerifier = 1;
 }
 
+def EmitC_DivOp : EmitC_BinaryArithOp<"div", []> {
+  let summary = "Division operation";
+  let description = [{
+    With the `div` operation the arithmetic operator / (division) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the division operation.
+    %0 = emitc.div %arg0, %arg1 : (i32, i32) -> i32
+    %0 = emitc.div %arg2, %arg3 : (f64, f64) -> f64
+
+    // Generic form of the same operations.
+    %0 = "emitc.div" (%arg0, %arg1) : (i32, i32) -> i32
+    %0 = "emitc.div" (%arg2, %arg3) : (f64, f64) -> f64
+    ```
+  }];
+}
+
 def EmitC_IncludeOp
     : EmitC_Op<"include", [HasParent<"ModuleOp">]> {
   let summary = "Include operation";
@@ -203,6 +223,26 @@ def EmitC_IncludeOp
     UnitAttr:$is_standard_include
   );
   let hasCustomAssemblyFormat = 1;
+}
+
+def EmitC_MulOp : EmitC_BinaryArithOp<"mul", [Commutative]> {
+  let summary = "Multiplication operation";
+  let description = [{
+    With the `,ul` operation the arithmetic operator * (Multiplication) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the division operation.
+    %0 = emitc.mul %arg0, %arg1 : (i32, i32) -> i32
+    %0 = emitc.mul %arg2, %arg3 : (f64, f64) -> f64
+
+    // Generic form of the same operations.
+    %0 = "emitc.mul" (%arg0, %arg1) : (i32, i32) -> i32
+    %0 = "emitc.mul" (%arg2, %arg3) : (f64, f64) -> f64
+    ```
+  }];
 }
 
 def EmitC_SubOp : EmitC_BinaryArithOp<"sub", []> {
