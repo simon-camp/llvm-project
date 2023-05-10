@@ -176,6 +176,27 @@ def EmitC_ConstantOp : EmitC_Op<"constant", [ConstantLike]> {
   let hasVerifier = 1;
 }
 
+def EmitC_DivOp : EmitC_BinaryArithOp<"div", []> {
+  let summary = "Division operation";
+  let description = [{
+    With the `div` operation the arithmetic operator / (division) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the division operation.
+    %0 = emitc.div %arg0, %arg1 : (i32, i32) -> i32
+    %1 = emitc.div %arg2, %arg3 : (f64, f64) -> f64
+    ```
+    ```c++
+    // Code emitted for the operations above.
+    int32_t v5 = v1 / v2;
+    double v6 = v3 / v4;
+    ```
+  }];
+}
+
 def EmitC_IncludeOp
     : EmitC_Op<"include", [HasParent<"ModuleOp">]> {
   let summary = "Include operation";
@@ -204,6 +225,48 @@ def EmitC_IncludeOp
     UnitAttr:$is_standard_include
   );
   let hasCustomAssemblyFormat = 1;
+}
+
+def EmitC_MulOp : EmitC_BinaryArithOp<"mul", []> {
+  let summary = "Multiplication operation";
+  let description = [{
+    With the `mul` operation the arithmetic operator * (multiplication) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the division operation.
+    %0 = emitc.mul %arg0, %arg1 : (i32, i32) -> i32
+    %1 = emitc.mul %arg2, %arg3 : (f64, f64) -> f64
+    ```
+    ```c++
+    // Code emitted for the operations above.
+    int32_t v5 = v1 * v2;
+    double v6 = v3 * v4;
+    ```
+  }];
+}
+
+def EmitC_RemOp : EmitC_BinaryArithOp<"rem", []> {
+  let summary = "Remainder operation";
+  let description = [{
+    With the `rem` operation the arithmetic operator % (remainder) can
+    be applied.
+
+    Example:
+
+    ```mlir
+    // Custom form of the remainder operation.
+    %0 = emitc.rem %arg0, %arg1 : (i32, i32) -> i32
+    %1 = emitc.rem %arg2, %arg3 : (i64, i64) -> i64
+    ```
+    ```c++
+    // Code emitted for the operations above.
+    int32_t v5 = v1 % v2;
+    int64_t v6 = v3 % v4;
+    ```
+  }];
 }
 
 def EmitC_SubOp : EmitC_BinaryArithOp<"sub", []> {

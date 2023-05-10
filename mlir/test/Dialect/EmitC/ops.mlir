@@ -54,3 +54,28 @@ func.func @sub_pointer(%arg0: !emitc.ptr<f32>, %arg1: i32, %arg2: !emitc.opaque<
   %4 = "emitc.sub" (%arg0, %arg3) : (!emitc.ptr<f32>, !emitc.ptr<f32>) -> i32
   return
 }
+
+func.func @mul_int(%arg0: i32, %arg1: i32) {
+  %1 = "emitc.mul" (%arg0, %arg1) : (i32, i32) -> i32
+  return
+}
+
+func.func @mul_float(%arg0: f64, %arg1: f64) {
+  %1 = "emitc.mul" (%arg0, %arg1) : (f64, f64) -> f64
+  return
+}
+
+func.func @div_int(%arg0: i32, %arg1: i32) {
+  %1 = "emitc.div" (%arg0, %arg1) : (i32, i32) -> i32
+  return
+}
+
+func.func @div_float(%arg0: f64, %arg1: f64) {
+  %1 = "emitc.div" (%arg0, %arg1) : (f64, f64) -> f64
+  return
+}
+
+func.func @rem_int(%arg0: i32, %arg1: i32) {
+  %1 = "emitc.rem" (%arg0, %arg1) : (i32, i32) -> i32
+  return
+}
