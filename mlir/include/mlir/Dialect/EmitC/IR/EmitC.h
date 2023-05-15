@@ -29,4 +29,13 @@
 #define GET_OP_CLASSES
 #include "mlir/Dialect/EmitC/IR/EmitC.h.inc"
 
+namespace mlir {
+namespace emitc {
+
+bool isValidIdentifier(llvm::StringRef identifier);
+Type decayType(Type type);
+
+} // namespace emitc
+} // namespace mlir
+
 #endif // MLIR_DIALECT_EMITC_IR_EMITC_H

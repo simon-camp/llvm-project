@@ -74,3 +74,10 @@ func.func @div_float(%arg0: f64, %arg1: f64) {
   %1 = "emitc.div" (%arg0, %arg1) : (f64, f64) -> f64
   return
 }
+
+emitc.struct.def !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>
+func.func @structs(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) {
+  %0 = emitc.struct.member.read %arg0 <"size" : none> : (!emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) -> index
+  emitc.struct.member.write %0 %arg0 <"size" : none> : index, !emitc.struct<"string_view", <"data" : !emitc.ptr<i8>>, <"size" : index>>
+  return
+}

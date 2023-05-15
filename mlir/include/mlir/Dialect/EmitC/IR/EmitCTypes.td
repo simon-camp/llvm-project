@@ -16,6 +16,7 @@
 
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/Dialect/EmitC/IR/EmitCBase.td"
+include "mlir/Dialect/EmitC/IR/EmitCAttributes.td"
 
 //===----------------------------------------------------------------------===//
 // EmitC type definitions
@@ -70,6 +71,20 @@ def EmitC_PointerType : EmitC_Type<"Pointer", "ptr"> {
     }]>
   ];
   let assemblyFormat = "`<` qualified($pointee) `>`";
+}
+
+def EmitC_StructType : EmitC_Type<"Struct", "struct"> {
+  let parameters = (ins
+    ArrayRefParameter<"MemberAttr", "members">:$members,
+    StringRefParameter<"the name of the struct">:$name);
+  let assemblyFormat = "`<` $name `,` $members`>`";
+
+  let genVerifyDecl = 1;
+
+  let extraClassDeclaration = [{
+    bool hasMember(StringRef member);
+    MemberAttr getMember(StringRef member);
+  }];
 }
 
 #endif // MLIR_DIALECT_EMITC_IR_EMITCTYPES

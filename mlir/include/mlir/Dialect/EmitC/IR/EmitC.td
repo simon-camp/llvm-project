@@ -18,6 +18,7 @@ include "mlir/Dialect/EmitC/IR/EmitCTypes.td"
 
 include "mlir/Interfaces/CastInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/SymbolInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // EmitC op definitions
@@ -387,6 +388,42 @@ def EmitC_SubOp : EmitC_BinaryOp<"sub", []> {
         -> !emitc.opaque<"ptrdiff_t">
     ```
   }];
+}
+
+def EmitC_StructDefOp : EmitC_Op<"struct.def", [HasParent<"ModuleOp">]> {
+  let arguments = (ins TypeAttrOf<EmitC_StructType>:$type);
+
+  let assemblyFormat = "$type attr-dict";
+
+  let hasVerifier = 1;
+
+  let extraClassDeclaration = [{
+    bool hasMember(StringRef member);
+  }];
+}
+
+def EmitC_StructMemberReadOp : EmitC_Op<"struct.member.read"> {
+  let arguments = (ins
+    EmitC_StructType:$struct_operand,
+    Arg<EmitC_MemberAttr, "the struct member to read">:$member
+  );
+  let results = (outs AnyType:$result);
+
+  let assemblyFormat = "$struct_operand $member `:` functional-type(operands, results) attr-dict";
+
+  let hasVerifier = 1;
+}
+
+def EmitC_StructMemberWriteOp : EmitC_Op<"struct.member.write"> {
+  let arguments = (ins
+    AnyType:$value,
+    EmitC_StructType:$struct_operand,
+    Arg<EmitC_MemberAttr, "the struct member to write">:$member
+  );
+
+  let assemblyFormat = "$value $struct_operand $member `:` type(operands) attr-dict";
+
+  let hasVerifier = 1;
 }
 
 def EmitC_VariableOp : EmitC_Op<"variable", []> {

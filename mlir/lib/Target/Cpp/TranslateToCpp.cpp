@@ -247,8 +247,8 @@ static LogicalResult printOperation(CppEmitter &emitter,
 }
 
 static LogicalResult printBinaryOperation(CppEmitter &emitter,
-                                               Operation *operation,
-                                               StringRef binaryArithOperator) {
+                                          Operation *operation,
+                                          StringRef binaryArithOperator) {
   raw_ostream &os = emitter.ostream();
 
   if (failed(emitter.emitAssignPrefix(*operation)))
@@ -483,6 +483,48 @@ static LogicalResult printOperation(CppEmitter &emitter,
     os << "<" << includeOp.getInclude() << ">";
   else
     os << "\"" << includeOp.getInclude() << "\"";
+
+  return success();
+}
+
+static LogicalResult printOperation(CppEmitter &emitter,
+                                    emitc::StructDefOp structDefOp) {
+  raw_ostream &os = emitter.ostream();
+  StructType type = structDefOp.getType();
+  os << "struct " << type.getName() << " {\n";
+  for (MemberAttr member : type.getMembers()) {
+    os << "  ";
+    if (failed(emitter.emitType(structDefOp.getLoc(), member.getType())))
+      return failure();
+    os << " " << member.getName() << ";\n";
+  }
+  os << "};";
+
+  return success();
+}
+
+static LogicalResult
+printOperation(CppEmitter &emitter,
+               emitc::StructMemberReadOp structMemberReadOp) {
+  raw_ostream &os = emitter.ostream();
+  Operation &op = *structMemberReadOp.getOperation();
+
+  if (failed(emitter.emitAssignPrefix(op)))
+    return failure();
+  os << emitter.getOrCreateName(structMemberReadOp.getStructOperand()) << "."
+     << structMemberReadOp.getMember().getName();
+
+  return success();
+}
+
+static LogicalResult
+printOperation(CppEmitter &emitter,
+               emitc::StructMemberWriteOp structMemberWriteOp) {
+  raw_ostream &os = emitter.ostream();
+
+  os << emitter.getOrCreateName(structMemberWriteOp.getStructOperand()) << "."
+     << structMemberWriteOp.getMember().getName() << " = "
+     << emitter.getOrCreateName(structMemberWriteOp.getValue());
 
   return success();
 }
@@ -1011,7 +1053,9 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
           .Case<emitc::AddOp, emitc::ApplyOp, emitc::CallOp, emitc::CastOp,
                 emitc::ConstantOp, emitc::DivOp, emitc::EqOp, emitc::GeOp,
                 emitc::GtOp, emitc::IncludeOp, emitc::LeOp, emitc::LtOp,
-                emitc::MulOp, emitc::NeOp, emitc::SubOp, emitc::VariableOp>(
+                emitc::MulOp, emitc::NeOp, emitc::SubOp, emitc::StructDefOp,
+                emitc::StructMemberReadOp, emitc::StructMemberWriteOp,
+                emitc::VariableOp>(
               [&](auto op) { return printOperation(*this, op); })
           // Func ops.
           .Case<func::CallOp, func::ConstantOp, func::FuncOp, func::ReturnOp>(
@@ -1087,6 +1131,10 @@ LogicalResult CppEmitter::emitType(Location loc, Type type) {
     if (failed(emitType(loc, pType.getPointee())))
       return failure();
     os << "*";
+    return success();
+  }
+  if (auto sType = type.dyn_cast<emitc::StructType>()) {
+    os << "struct " << sType.getName();
     return success();
   }
   return emitError(loc, "cannot emit type ") << type;

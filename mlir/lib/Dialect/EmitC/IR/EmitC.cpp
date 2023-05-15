@@ -10,6 +10,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -43,6 +44,23 @@ Operation *EmitCDialect::materializeConstant(OpBuilder &builder,
                                              Location loc) {
   return builder.create<emitc::ConstantOp>(loc, type, value);
 }
+
+//===----------------------------------------------------------------------===//
+// Utility functions
+//===----------------------------------------------------------------------===//
+
+bool mlir::emitc::isValidIdentifier(llvm::StringRef identifier) {
+  auto validFirstChar = [](char c) {
+    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') || c == '_';
+  };
+  auto validChar = [&](char c) {
+    return validFirstChar(c) || ('0' <= c && c <= '9');
+  };
+  return identifier.size() > 0 && validFirstChar(identifier.front()) &&
+         llvm::all_of(identifier, [&](char c) { return validChar(c); });
+}
+
+Type mlir::emitc::decayType(Type type) { return type; }
 
 //===----------------------------------------------------------------------===//
 // AddOp
@@ -159,41 +177,31 @@ LogicalResult emitc::ConstantOp::verify() {
   return success();
 }
 
-OpFoldResult emitc::ConstantOp::fold(FoldAdaptor adaptor) {
-  return getValue();
-}
+OpFoldResult emitc::ConstantOp::fold(FoldAdaptor adaptor) { return getValue(); }
 
 //===----------------------------------------------------------------------===//
 // DivOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult DivOp::verify() {
-  return success();
-}
+LogicalResult DivOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // EqOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult EqOp::verify() {
-  return success();
-}
+LogicalResult EqOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // GeOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult GeOp::verify() {
-  return success();
-}
+LogicalResult GeOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // GtOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult GtOp::verify() {
-  return success();
-}
+LogicalResult GtOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // IncludeOp
@@ -234,33 +242,25 @@ ParseResult IncludeOp::parse(OpAsmParser &parser, OperationState &result) {
 // LeOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult LeOp::verify() {
-  return success();
-}
+LogicalResult LeOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // LtOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult LtOp::verify() {
-  return success();
-}
+LogicalResult LtOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // MulOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult MulOp::verify() {
-  return success();
-}
+LogicalResult MulOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // NeOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult NeOp::verify() {
-  return success();
-}
+LogicalResult NeOp::verify() { return success(); }
 
 //===----------------------------------------------------------------------===//
 // SubOp
@@ -284,6 +284,54 @@ LogicalResult SubOp::verify() {
     return emitOpError("requires that the result is an integer or of opaque "
                        "type if lhs and rhs are pointers");
 
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// StructDefOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult StructDefOp::verify() { return success(); }
+
+//===----------------------------------------------------------------------===//
+// StructMemberReadOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult StructMemberReadOp::verify() {
+  StructType structType = getStructOperand().getType();
+  StringRef memberName = getMember().getName();
+  if (!structType.hasMember(memberName))
+    return emitOpError() << "no member named '" << memberName << "' in 'struct "
+                         << structType.getName() << "'";
+
+  Type memberType = structType.getMember(memberName).getType();
+  if (decayType(memberType) != getResult().getType()) {
+    return emitOpError() << "member named '" << memberName << "' of type "
+                         << memberType
+                         << " is incompatible with result of type "
+                         << getResult().getType();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// StructMemberWriteOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult StructMemberWriteOp::verify() {
+  StructType structType = getStructOperand().getType();
+  StringRef memberName = getMember().getName();
+  if (!structType.hasMember(memberName))
+    return emitOpError() << "no member named '" << memberName << "' in 'struct "
+                         << structType.getName() << "'";
+
+  Type memberType = structType.getMember(memberName).getType();
+  Type valueType = getValue().getType();
+  if (decayType(valueType) != memberType) {
+    return emitOpError() << "value of type " << valueType
+                         << " is incompatible with member named '" << memberName
+                         << "' of type " << memberType;
+  }
   return success();
 }
 
@@ -373,4 +421,37 @@ void emitc::OpaqueType::print(AsmPrinter &printer) const {
   printer << "<\"";
   llvm::printEscapedString(getValue(), printer.getStream());
   printer << "\">";
+}
+
+//===----------------------------------------------------------------------===//
+// StructType
+//===----------------------------------------------------------------------===//
+
+LogicalResult StructType::verify(function_ref<InFlightDiagnostic()> emitError,
+                                 ArrayRef<MemberAttr> members, StringRef name) {
+  if (!isValidIdentifier(name))
+    return emitError() << "invalid identifier for struct type";
+  SetVector<StringRef> structMembers;
+  for (MemberAttr member : members) {
+    if (member.getType().isa<StructType>())
+      return emitError() << "nested struct types are not supported";
+    if (!structMembers.insert(member.getName()))
+      return emitError() << "duplicate member `" << member.getName() << "`";
+  }
+  return success();
+}
+
+bool StructType::hasMember(StringRef name) {
+  return llvm::any_of(getMembers(), [&name](MemberAttr member) {
+    return member.getName() == name;
+  });
+}
+
+MemberAttr StructType::getMember(StringRef name) {
+  assert(hasMember(name));
+  for (auto member : getMembers()) {
+    if (member.getName() == name)
+      return member;
+  }
+  return nullptr;
 }

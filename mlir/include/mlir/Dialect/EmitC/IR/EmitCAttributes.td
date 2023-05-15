@@ -48,4 +48,15 @@ def EmitC_OpaqueAttr : EmitC_Attr<"Opaque", "opaque"> {
 
 def EmitC_OpaqueOrTypedAttr : AnyAttrOf<[EmitC_OpaqueAttr, TypedAttrInterface]>;
 
+def EmitC_MemberAttr : EmitC_Attr<"Member", "member"> {
+  let parameters = (ins 
+      "Type":$type,
+      StringRefParameter<"the name of the member">:$name
+  );
+  let assemblyFormat = "`<` $name `:` $type `>`";
+}
+
+def EmitC_MemberArrayAttr :
+    TypedArrayAttrBase<EmitC_MemberAttr, "Array of members">;
+
 #endif // MLIR_DIALECT_EMITC_IR_EMITCATTRIBUTES

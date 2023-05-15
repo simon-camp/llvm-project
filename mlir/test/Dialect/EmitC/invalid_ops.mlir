@@ -167,3 +167,35 @@ func.func @sub_pointer_pointer(%arg0: !emitc.ptr<f32>, %arg1: !emitc.ptr<f32>) {
     %1 = "emitc.sub" (%arg0, %arg1) : (!emitc.ptr<f32>, !emitc.ptr<f32>) -> !emitc.ptr<f32>
     return
 }
+
+// -----
+
+func.func @struct_read_missing_member(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) {
+  // expected-error @+1 {{'emitc.struct.member.read' op no member named 'length' in 'struct string_view'}}
+  %0 = emitc.struct.member.read %arg0 <"length" : none> : (!emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) -> index
+  return
+}
+
+// -----
+
+func.func @struct_read_invlaid_type(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) {
+  // expected-error @+1 {{'emitc.struct.member.read' op member named 'size' of type 'index' is incompatible with result of type 'f32'}}
+  %0 = emitc.struct.member.read %arg0 <"size" : none> : (!emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) -> f32
+  return
+}
+
+// -----
+
+func.func @struct_write_missing_member(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>, %arg1 : index) {
+  // expected-error @+1 {{'emitc.struct.member.write' op no member named 'length' in 'struct string_view'}}
+  emitc.struct.member.write %arg1 %arg0 <"length" : none> : index, !emitc.struct<"string_view", <"data" : !emitc.ptr<i8>>, <"size" : index>>
+  return
+}
+
+// -----
+
+func.func @struct_write_invalid_type(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>, %arg1 : f32) {
+  // expected-error @+1 {{'emitc.struct.member.write' op value of type 'f32' is incompatible with member named 'size' of type 'index'}}
+  emitc.struct.member.write %arg1 %arg0 <"size" : none> : f32, !emitc.struct<"string_view", <"data" : !emitc.ptr<i8>>, <"size" : index>>
+  return
+}
