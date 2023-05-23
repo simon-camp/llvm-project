@@ -982,6 +982,12 @@ LogicalResult CppEmitter::emitAttribute(Location loc, Attribute attr) {
     return success();
   }
 
+  // Print opaque attributes.
+  if (auto sAttr = attr.dyn_cast<StringAttr>()) {
+    os << sAttr.getValue();
+    return success();
+  }
+
   // Print symbolic reference attributes.
   if (auto sAttr = attr.dyn_cast<SymbolRefAttr>()) {
     if (sAttr.getNestedReferences().size() > 1)

@@ -657,6 +657,20 @@ def ConvertMathToFuncs : Pass<"convert-math-to-funcs", "ModuleOp"> {
 }
 
 //===----------------------------------------------------------------------===//
+// MemRefToEmitC
+//===----------------------------------------------------------------------===//
+
+def MemRefToEmitCConversionPass : Pass<"convert-memref-to-emitc", "ModuleOp"> {
+  let summary = "Convert MemRef dialect to EmitC dialect";
+  let description = [{
+    This pass converts supported MemRef ops to calls of compiler generated
+    functions implementing these operations. The MemRef type gets converted to
+    a rank and element type specialized EmitC Struct type.
+  }];
+  let dependentDialects = ["emitc::EmitCDialect", "func::FuncDialect"];
+}
+
+//===----------------------------------------------------------------------===//
 // MemRefToLLVM
 //===----------------------------------------------------------------------===//
 
