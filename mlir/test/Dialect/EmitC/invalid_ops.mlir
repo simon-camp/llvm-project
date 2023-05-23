@@ -199,3 +199,11 @@ func.func @struct_write_invalid_type(%arg0 : !emitc.struct<"string_view", #emitc
   emitc.struct.member.write %arg1 %arg0 <"size" : none> : f32, !emitc.struct<"string_view", <"data" : !emitc.ptr<i8>>, <"size" : index>>
   return
 }
+
+// -----
+
+func.func @struct_write_array_type(%arg0 : !emitc.struct<"fixed_str", #emitc.member<"data" : !emitc.array<32, i8>>>, %arg1 : !emitc.array<32, i8>) {
+  // expected-error @+1 {{'emitc.struct.member.write' op cannot assign a member of array type}}
+  emitc.struct.member.write %arg1 %arg0 <"data" : none> : !emitc.array<32, i8>, !emitc.struct<"fixed_str", #emitc.member<"data" : !emitc.array<32, i8>>>
+  return
+}

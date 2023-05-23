@@ -1,5 +1,14 @@
 // RUN: mlir-translate -mlir-to-cpp %s | FileCheck %s
 
+// CHECK-LABEL: void array_types() {
+func.func @array_types() {
+  // CHECK-NEXT: int v1[3] = {};
+  %0 = "emitc.constant"(){value = #emitc.opaque<"{}">} : () -> !emitc.array<3, !emitc.opaque<"int">>
+  // CHECK-NEXT: int v2[] = {0, 1, 2, 3};
+  %1 = "emitc.constant"(){value = #emitc.opaque<"{0, 1, 2, 3}">} : () -> !emitc.array<?, !emitc.opaque<"int">>
+  return
+}
+
 // CHECK-LABEL: void opaque_types() {
 func.func @opaque_types() {
   // CHECK-NEXT: f<int>();

@@ -2,6 +2,17 @@
 // check parser
 // RUN: mlir-opt -verify-diagnostics %s | mlir-opt -verify-diagnostics | FileCheck %s
 
+// CHECK-LABEL: func @array_types() {
+func.func @array_types() {
+  // CHECK-NEXT: !emitc.array<3, i32>
+  %0 = "emitc.constant"(){value = #emitc.opaque<"{0}">} : () -> !emitc.array<3, i32>
+  // CHECK-NEXT: !emitc.array<?, f32>
+  %1 = "emitc.constant"(){value = #emitc.opaque<"{0.0f, 1.0f, 2.0f, 3.0f}">} : () -> !emitc.array<?, f32>
+
+  return
+}
+
+
 // CHECK-LABEL: func @opaque_types() {
 func.func @opaque_types() {
   // CHECK-NEXT: !emitc.opaque<"int">

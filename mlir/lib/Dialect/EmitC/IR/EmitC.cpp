@@ -60,7 +60,11 @@ bool mlir::emitc::isValidIdentifier(llvm::StringRef identifier) {
          llvm::all_of(identifier, [&](char c) { return validChar(c); });
 }
 
-Type mlir::emitc::decayType(Type type) { return type; }
+Type mlir::emitc::decayType(Type type) {
+  if (auto aType = dyn_cast<mlir::emitc::ArrayType>(type))
+    return mlir::emitc::PointerType::get(aType.getElementType());
+  return type;
+}
 
 //===----------------------------------------------------------------------===//
 // AddOp
@@ -326,6 +330,8 @@ LogicalResult StructMemberWriteOp::verify() {
                          << structType.getName() << "'";
 
   Type memberType = structType.getMember(memberName).getType();
+  if (isa<ArrayType>(memberType))
+    return emitOpError() << "cannot assign a member of array type";
   Type valueType = getValue().getType();
   if (decayType(valueType) != memberType) {
     return emitOpError() << "value of type " << valueType
@@ -395,6 +401,24 @@ void emitc::OpaqueAttr::print(AsmPrinter &printer) const {
 #include "mlir/Dialect/EmitC/IR/EmitCTypes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArrayType::verify(function_ref<InFlightDiagnostic()> emitError,
+                                Type elementType,
+                                std::optional<uint64_t> size) {
+  if (elementType.isa<ArrayType>()) {
+    return emitError() << "multidimensional arrays are not supported";
+  }
+  if (elementType.isa<PointerType>()) {
+    return emitError() << "elements of type pointer are not supported";
+  }
+  return success();
+}
+
+bool ArrayType::hasUnknownSize() { return !getSize().has_value(); }
+
+//===----------------------------------------------------------------------===//
 // OpaqueType
 //===----------------------------------------------------------------------===//
 
@@ -424,6 +448,18 @@ void emitc::OpaqueType::print(AsmPrinter &printer) const {
 }
 
 //===----------------------------------------------------------------------===//
+// PointerType
+//===----------------------------------------------------------------------===//
+
+LogicalResult PointerType::verify(function_ref<InFlightDiagnostic()> emitError,
+                                  Type pointee) {
+  if (pointee.isa<ArrayType>()) {
+    return emitError() << "pointers to arrays are not supported";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // StructType
 //===----------------------------------------------------------------------===//
 
@@ -437,6 +473,20 @@ LogicalResult StructType::verify(function_ref<InFlightDiagnostic()> emitError,
       return emitError() << "nested struct types are not supported";
     if (!structMembers.insert(member.getName()))
       return emitError() << "duplicate member `" << member.getName() << "`";
+  }
+  if (members.size() == 1) {
+    MemberAttr member = members[0];
+    auto aType = member.getType().dyn_cast<ArrayType>();
+    if (aType && aType.hasUnknownSize())
+      return emitError() << "flexible array member '" << member.getName()
+                         << "' not allowed in otherwise empty struct";
+  }
+  for (size_t i = 0; i < members.size() - 1; ++i) {
+    MemberAttr member = members[i];
+    auto aType = member.getType().dyn_cast<ArrayType>();
+    if (aType && aType.hasUnknownSize())
+      return emitError() << "flexible array member '" << member.getName()
+                         << "' must be at the end of a struct";
   }
   return success();
 }

@@ -27,6 +27,27 @@ class EmitC_Type<string name, string typeMnemonic>
   let mnemonic = typeMnemonic;
 }
 
+def EmitC_ArrayType : EmitC_Type<"Array", "array"> {
+  let parameters = (ins "Type":$elementType,
+                        OptionalParameter<"std::optional<uint64_t>">:$size);
+  let builders = [
+    TypeBuilderWithInferredContext<(ins "Type":$elementType, "std::optional<uint64_t>":$size), [{
+      return $_get(elementType.getContext(), elementType, size);
+    }]>,
+    TypeBuilderWithInferredContext<(ins "Type":$elementType, "uint64_t":$size), [{
+      return $_get(elementType.getContext(), elementType, std::optional<uint64_t>{size});
+    }]>
+  ];
+  let assemblyFormat = "`<` ($size^) : (`?`)? `,` qualified($elementType) `>`";
+
+  let genVerifyDecl = 1;
+
+  let extraClassDeclaration = [{
+    bool hasUnknownSize();
+  }];
+}
+
+
 def EmitC_OpaqueType : EmitC_Type<"Opaque", "opaque"> {
   let summary = "An opaque type";
 
@@ -71,6 +92,8 @@ def EmitC_PointerType : EmitC_Type<"Pointer", "ptr"> {
     }]>
   ];
   let assemblyFormat = "`<` qualified($pointee) `>`";
+
+  let genVerifyDecl = 1;
 }
 
 def EmitC_StructType : EmitC_Type<"Struct", "struct"> {

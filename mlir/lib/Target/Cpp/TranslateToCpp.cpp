@@ -23,6 +23,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/raw_ostream.h"
 #include <utility>
 
 #define DEBUG_TYPE "translate-to-cpp"
@@ -30,6 +31,15 @@
 using namespace mlir;
 using namespace mlir::emitc;
 using llvm::formatv;
+
+struct Declaration {
+  Declaration() : prefixStream(prefixString), suffixStream(suffixString) {}
+
+  std::string prefixString;
+  std::string suffixString;
+  llvm::raw_string_ostream prefixStream;
+  llvm::raw_string_ostream suffixStream;
+};
 
 /// Convenience functions to produce interleaved output with functions returning
 /// a LogicalResult. This is different than those in STLExtras as functions used
@@ -77,8 +87,13 @@ struct CppEmitter {
   /// Emits operation 'op' with/without training semicolon or returns failure.
   LogicalResult emitOperation(Operation &op, bool trailingSemicolon);
 
+  LogicalResult buildTypeDeclaration(Location loc, Type type,
+                                     Declaration &decl);
+
   /// Emits type 'type' or returns failure.
   LogicalResult emitType(Location loc, Type type);
+
+  LogicalResult emitDeclaration(Location loc, Type type, StringRef identifier);
 
   /// Emits array of types as a std::tuple of the emitted types.
   /// - emits void for an empty array;
@@ -122,7 +137,12 @@ struct CppEmitter {
   /// Return the existing or a new label of a Block.
   StringRef getOrCreateName(Block &block);
 
-  /// Whether to map an mlir integer to a unsigned integer in C++.
+  /// Whether the C++ representation of the type is copy assignable. Assignments
+  /// are used when the option declareVariablesAtTop is se. This is needed in
+  /// the translation of func.func with multiple blocks.
+  bool isCopyAssignable(Type type);
+
+  /// Whether to map an mlir integer to a unsigned integer in C/C++.
   bool shouldMapToUnsigned(IntegerType::SignednessSemantics val);
 
   /// RAII helper function to manage entering/exiting C++ scopes.
@@ -494,9 +514,10 @@ static LogicalResult printOperation(CppEmitter &emitter,
   os << "struct " << type.getName() << " {\n";
   for (MemberAttr member : type.getMembers()) {
     os << "  ";
-    if (failed(emitter.emitType(structDefOp.getLoc(), member.getType())))
+    if (failed(emitter.emitDeclaration(structDefOp.getLoc(), member.getType(),
+                                       member.getName())))
       return failure();
-    os << " " << member.getName() << ";\n";
+    os << ";\n";
   }
   os << "};";
 
@@ -546,19 +567,20 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
   }
 
   for (auto pair : llvm::zip(iterArgs, operands)) {
-    if (failed(emitter.emitType(forOp.getLoc(), std::get<0>(pair).getType())))
+    if (failed(emitter.emitDeclaration(
+            forOp.getLoc(), std::get<0>(pair).getType(),
+            emitter.getOrCreateName(std::get<0>(pair)))))
       return failure();
-    os << " " << emitter.getOrCreateName(std::get<0>(pair)) << " = ";
+    os << " = ";
     os << emitter.getOrCreateName(std::get<1>(pair)) << ";";
     os << "\n";
   }
 
   os << "for (";
-  if (failed(
-          emitter.emitType(forOp.getLoc(), forOp.getInductionVar().getType())))
+  if (failed(emitter.emitDeclaration(
+          forOp.getLoc(), forOp.getInductionVar().getType(),
+          emitter.getOrCreateName(forOp.getInductionVar()))))
     return failure();
-  os << " ";
-  os << emitter.getOrCreateName(forOp.getInductionVar());
   os << " = ";
   os << emitter.getOrCreateName(forOp.getLowerBound());
   os << "; ";
@@ -725,14 +747,15 @@ static LogicalResult printOperation(CppEmitter &emitter,
   os << " " << functionOp.getName();
 
   os << "(";
-  if (failed(interleaveCommaWithError(
-          functionOp.getArguments(), os,
-          [&](BlockArgument arg) -> LogicalResult {
-            if (failed(emitter.emitType(functionOp.getLoc(), arg.getType())))
-              return failure();
-            os << " " << emitter.getOrCreateName(arg);
-            return success();
-          })))
+  if (failed(interleaveCommaWithError(functionOp.getArguments(), os,
+                                      [&](BlockArgument arg) -> LogicalResult {
+                                        if (failed(emitter.emitDeclaration(
+                                                functionOp.getLoc(),
+                                                arg.getType(),
+                                                emitter.getOrCreateName(arg))))
+                                          return failure();
+                                        return success();
+                                      })))
     return failure();
   os << ") {\n";
   os.indent();
@@ -766,11 +789,12 @@ static LogicalResult printOperation(CppEmitter &emitter,
       if (emitter.hasValueInScope(arg))
         return functionOp.emitOpError(" block argument #")
                << arg.getArgNumber() << " is out of scope";
-      if (failed(
-              emitter.emitType(block.getParentOp()->getLoc(), arg.getType()))) {
+      if (failed(emitter.emitDeclaration(block.getParentOp()->getLoc(),
+                                         arg.getType(),
+                                         emitter.getOrCreateName(arg)))) {
         return failure();
       }
-      os << " " << emitter.getOrCreateName(arg) << ";\n";
+      os << ";\n";
     }
   }
 
@@ -815,6 +839,13 @@ StringRef CppEmitter::getOrCreateName(Block &block) {
   if (!blockMapper.count(&block))
     blockMapper.insert(&block, formatv("label{0}", ++labelInScopeCount.top()));
   return *blockMapper.begin(&block);
+}
+
+bool CppEmitter::isCopyAssignable(Type type) {
+  // TODO(simon-camp): Remove special handling of the TensorType from the
+  // emitter.
+  return isa<IntegerType, IndexType, FloatType, emitc::PointerType,
+             emitc::OpaqueType, TensorType>(type);
 }
 
 bool CppEmitter::shouldMapToUnsigned(IntegerType::SignednessSemantics val) {
@@ -983,6 +1014,11 @@ LogicalResult CppEmitter::emitVariableAssignment(OpResult result) {
     return result.getDefiningOp()->emitOpError(
         "result variable for the operation has not been declared");
   }
+  if (!isCopyAssignable(result.getType())) {
+    result.getOwner()->emitOpError(" result argument #")
+        << result.getResultNumber() << " of type " << result.getType()
+        << " is not copy assignable";
+  }
   os << getOrCreateName(result) << " = ";
   return success();
 }
@@ -993,9 +1029,9 @@ LogicalResult CppEmitter::emitVariableDeclaration(OpResult result,
     return result.getDefiningOp()->emitError(
         "result variable for the operation already declared");
   }
-  if (failed(emitType(result.getOwner()->getLoc(), result.getType())))
+  if (failed(emitDeclaration(result.getOwner()->getLoc(), result.getType(),
+                             getOrCreateName(result))))
     return failure();
-  os << " " << getOrCreateName(result);
   if (trailingSemicolon)
     os << ";\n";
   return success();
@@ -1076,19 +1112,23 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
   return success();
 }
 
-LogicalResult CppEmitter::emitType(Location loc, Type type) {
+LogicalResult CppEmitter::buildTypeDeclaration(Location loc, Type type,
+                                               Declaration &decl) {
+  raw_ostream &prefix = decl.prefixStream;
+  raw_ostream &suffix = decl.suffixStream;
+
   if (auto iType = type.dyn_cast<IntegerType>()) {
     switch (iType.getWidth()) {
     case 1:
-      return (os << "bool"), success();
+      return (prefix << "bool"), success();
     case 8:
     case 16:
     case 32:
     case 64:
       if (shouldMapToUnsigned(iType.getSignedness()))
-        return (os << "uint" << iType.getWidth() << "_t"), success();
+        return (prefix << "uint" << iType.getWidth() << "_t"), success();
       else
-        return (os << "int" << iType.getWidth() << "_t"), success();
+        return (prefix << "int" << iType.getWidth() << "_t"), success();
     default:
       return emitError(loc, "cannot emit integer type ") << type;
     }
@@ -1096,48 +1136,72 @@ LogicalResult CppEmitter::emitType(Location loc, Type type) {
   if (auto fType = type.dyn_cast<FloatType>()) {
     switch (fType.getWidth()) {
     case 32:
-      return (os << "float"), success();
+      return (prefix << "float"), success();
     case 64:
-      return (os << "double"), success();
+      return (prefix << "double"), success();
     default:
       return emitError(loc, "cannot emit float type ") << type;
     }
   }
   if (auto iType = type.dyn_cast<IndexType>())
-    return (os << "size_t"), success();
+    return (prefix << "size_t"), success();
   if (auto tType = type.dyn_cast<TensorType>()) {
     if (!tType.hasRank())
       return emitError(loc, "cannot emit unranked tensor type");
     if (!tType.hasStaticShape())
       return emitError(loc, "cannot emit tensor type with non static shape");
-    os << "Tensor<";
-    if (failed(emitType(loc, tType.getElementType())))
+    prefix << "Tensor<";
+    if (failed(buildTypeDeclaration(loc, tType.getElementType(), decl)))
       return failure();
     auto shape = tType.getShape();
     for (auto dimSize : shape) {
-      os << ", ";
-      os << dimSize;
+      prefix << ", ";
+      prefix << dimSize;
     }
-    os << ">";
+    prefix << ">";
     return success();
   }
-  if (auto tType = type.dyn_cast<TupleType>())
-    return emitTupleType(loc, tType.getTypes());
   if (auto oType = type.dyn_cast<emitc::OpaqueType>()) {
-    os << oType.getValue();
+    prefix << oType.getValue();
+    return success();
+  }
+  if (auto aType = type.dyn_cast<emitc::ArrayType>()) {
+    suffix << "[";
+    if (!aType.hasUnknownSize())
+      suffix << aType.getSize().value();
+    suffix << "]";
+    if (failed(buildTypeDeclaration(loc, aType.getElementType(), decl)))
+      return failure();
     return success();
   }
   if (auto pType = type.dyn_cast<emitc::PointerType>()) {
-    if (failed(emitType(loc, pType.getPointee())))
+    if (failed(buildTypeDeclaration(loc, pType.getPointee(), decl)))
       return failure();
-    os << "*";
+    prefix << "*";
     return success();
   }
   if (auto sType = type.dyn_cast<emitc::StructType>()) {
-    os << "struct " << sType.getName();
+    prefix << "struct " << sType.getName();
     return success();
   }
   return emitError(loc, "cannot emit type ") << type;
+}
+
+LogicalResult CppEmitter::emitDeclaration(Location loc, Type type,
+                                          StringRef identifier) {
+  Declaration decl;
+  if (failed(buildTypeDeclaration(loc, type, decl)))
+    return failure();
+  os << decl.prefixString << " " << identifier << decl.suffixString;
+  return success();
+}
+
+LogicalResult CppEmitter::emitType(Location loc, Type type) {
+  Declaration decl;
+  if (failed(buildTypeDeclaration(loc, type, decl)))
+    return failure();
+  os << decl.prefixString << decl.suffixString;
+  return success();
 }
 
 LogicalResult CppEmitter::emitTypes(Location loc, ArrayRef<Type> types) {

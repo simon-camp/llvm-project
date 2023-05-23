@@ -81,3 +81,11 @@ func.func @structs(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !
   emitc.struct.member.write %0 %arg0 <"size" : none> : index, !emitc.struct<"string_view", <"data" : !emitc.ptr<i8>>, <"size" : index>>
   return
 }
+
+!struct_type_a = !emitc.struct<"struct_array", #emitc.member<"array" : !emitc.array<3, i8>>, #emitc.member<"pointer" : !emitc.ptr<i8>>>
+emitc.struct.def !struct_type_a
+func.func @struct_array_member(%arg0 : !struct_type_a, %arg1 : !emitc.array<3, i8>) {
+  %0 = emitc.struct.member.read %arg0 <"array" : none> : (!struct_type_a) -> !emitc.ptr<i8>
+  emitc.struct.member.write %arg1 %arg0 <"pointer" : none> :  !emitc.array<3, i8>, !struct_type_a
+  return
+}
