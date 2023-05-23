@@ -390,6 +390,40 @@ def EmitC_SubOp : EmitC_BinaryOp<"sub", []> {
   }];
 }
 
+def SubscriptReadOp : EmitC_Op<"subscript.read", []> {
+  let summary = "subcript operation";
+  let description = [{
+    With the `subcript` operation the operator[] can
+    be applied to read a value from the operand at the specified offset.    ```
+  }];
+  let arguments = (ins
+    AnyType:$operand,
+    AnyType:$index
+  );
+  let results = (outs AnyType);
+
+  let assemblyFormat = "operands attr-dict `:` functional-type(operands, results)";
+
+  let hasVerifier = 1;
+}
+
+def EmitC_SubscriptWriteOp : EmitC_Op<"subscript.write", []> {
+  let summary = "subcript operation";
+  let description = [{
+    With the `subcript` operation the operator[] can
+    be applied to write a value to the operand at the specified offset.    ```
+  }];
+  let arguments = (ins
+    AnyType:$value,
+    AnyType:$operand,
+    AnyType:$index
+  );
+
+  let assemblyFormat = "operands attr-dict `:` type(operands)";
+
+  let hasVerifier = 1;
+}
+
 def EmitC_StructDefOp : EmitC_Op<"struct.def", [HasParent<"ModuleOp">]> {
   let arguments = (ins TypeAttrOf<EmitC_StructType>:$type);
 

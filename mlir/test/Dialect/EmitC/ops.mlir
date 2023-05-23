@@ -75,6 +75,15 @@ func.func @div_float(%arg0: f64, %arg1: f64) {
   return
 }
 
+func.func @arrays() {
+  %0 = "emitc.constant"(){value = #emitc.opaque<"{0}">} : () -> !emitc.array<3, i32>
+  %1 = "emitc.constant"(){value = 1 : index} : () -> index
+  %2 = emitc.subscript.read %0, %1 : (!emitc.array<3, i32>, index) -> i32
+  %3 = emitc.add %2, %2 : (i32, i32) -> i32
+  emitc.subscript.write %3, %0, %1 : i32, !emitc.array<3, i32>, index
+  return
+}
+
 emitc.struct.def !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>
 func.func @structs(%arg0 : !emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) {
   %0 = emitc.struct.member.read %arg0 <"size" : none> : (!emitc.struct<"string_view", #emitc.member<"data" : !emitc.ptr<i8>>, #emitc.member<"size" : index>>) -> index

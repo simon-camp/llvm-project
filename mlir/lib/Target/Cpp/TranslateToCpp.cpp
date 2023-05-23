@@ -550,6 +550,30 @@ printOperation(CppEmitter &emitter,
   return success();
 }
 
+static LogicalResult printOperation(CppEmitter &emitter,
+                                    emitc::SubscriptReadOp subscriptReadOp) {
+  raw_ostream &os = emitter.ostream();
+  Operation &op = *subscriptReadOp.getOperation();
+
+  if (failed(emitter.emitAssignPrefix(op)))
+    return failure();
+  os << emitter.getOrCreateName(subscriptReadOp.getOperand()) << "["
+     << emitter.getOrCreateName(subscriptReadOp.getIndex()) << "]";
+
+  return success();
+}
+
+static LogicalResult printOperation(CppEmitter &emitter,
+                                    emitc::SubscriptWriteOp subscriptWriteOp) {
+  raw_ostream &os = emitter.ostream();
+
+  os << emitter.getOrCreateName(subscriptWriteOp.getOperand()) << "["
+     << emitter.getOrCreateName(subscriptWriteOp.getIndex()) << "]";
+  os << " = " << emitter.getOrCreateName(subscriptWriteOp.getValue());
+
+  return success();
+}
+
 static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
 
   raw_indented_ostream &os = emitter.ostream();
@@ -1091,6 +1115,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
                 emitc::GtOp, emitc::IncludeOp, emitc::LeOp, emitc::LtOp,
                 emitc::MulOp, emitc::NeOp, emitc::SubOp, emitc::StructDefOp,
                 emitc::StructMemberReadOp, emitc::StructMemberWriteOp,
+                emitc::SubscriptReadOp, emitc::SubscriptWriteOp,
                 emitc::VariableOp>(
               [&](auto op) { return printOperation(*this, op); })
           // Func ops.

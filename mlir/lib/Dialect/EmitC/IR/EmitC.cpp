@@ -342,6 +342,36 @@ LogicalResult StructMemberWriteOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// SubscriptReadOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult SubscriptReadOp::verify() {
+  if (!isa<ArrayType, PointerType, OpaqueType>(getOperand().getType()))
+    return emitOpError()
+           << "requires operand to be of array, pointer or opaque type";
+  if (!isa<IndexType, IntegerType, OpaqueType>(getIndex().getType()))
+    return emitOpError()
+           << "requires index to be of integer, index or opaque type";
+  // TODO: check that pointee/element type is compatible with result type
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// SubscriptWriteOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult SubscriptWriteOp::verify() {
+  if (!isa<ArrayType, PointerType, OpaqueType>(getOperand().getType()))
+    return emitOpError()
+           << "requires operand to be of array, pointer or opaque type";
+  if (!isa<IntegerType, IndexType, OpaqueType>(getIndex().getType()))
+    return emitOpError()
+           << "requires index to be of integer, index or opaque type";
+  // TODO: check that pointee/element type is compatible with value type
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // VariableOp
 //===----------------------------------------------------------------------===//
 
