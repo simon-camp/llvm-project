@@ -160,9 +160,7 @@ LogicalResult emitc::ConstantOp::verify() {
   return success();
 }
 
-OpFoldResult emitc::ConstantOp::fold(FoldAdaptor adaptor) {
-  return getValue();
-}
+OpFoldResult emitc::ConstantOp::fold(FoldAdaptor adaptor) { return getValue(); }
 
 //===----------------------------------------------------------------------===//
 // IncludeOp
@@ -257,7 +255,6 @@ LogicalResult emitc::VariableOp::verify() {
 #define GET_OP_CLASSES
 #include "mlir/Dialect/EmitC/IR/EmitC.cpp.inc"
 
-
 //===----------------------------------------------------------------------===//
 // EmitC Enums
 //===----------------------------------------------------------------------===//
@@ -300,6 +297,24 @@ void emitc::OpaqueAttr::print(AsmPrinter &printer) const {
 #include "mlir/Dialect/EmitC/IR/EmitCTypes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+LogicalResult ArrayType::verify(function_ref<InFlightDiagnostic()> emitError,
+                                Type elementType,
+                                std::optional<uint64_t> size) {
+  if (elementType.isa<ArrayType>()) {
+    return emitError() << "multidimensional arrays are not supported";
+  }
+  if (elementType.isa<PointerType>()) {
+    return emitError() << "elements of type pointer are not supported";
+  }
+  return success();
+}
+
+bool ArrayType::hasUnknownSize() { return !getSize().has_value(); }
+
+//===----------------------------------------------------------------------===//
 // OpaqueType
 //===----------------------------------------------------------------------===//
 
@@ -326,4 +341,16 @@ void emitc::OpaqueType::print(AsmPrinter &printer) const {
   printer << "<\"";
   llvm::printEscapedString(getValue(), printer.getStream());
   printer << "\">";
+}
+
+//===----------------------------------------------------------------------===//
+// PointerType
+//===----------------------------------------------------------------------===//
+
+LogicalResult PointerType::verify(function_ref<InFlightDiagnostic()> emitError,
+                                  Type pointee) {
+  if (pointee.isa<ArrayType>()) {
+    return emitError() << "pointers to arrays are not supported";
+  }
+  return success();
 }
