@@ -20,8 +20,15 @@ func.func @cast(%arg0: i32) {
   return
 }
 
-func.func @c() {
-  %1 = "emitc.constant"(){value = 42 : i32} : () -> i32
+func.func @constant() {
+  %1 = "emitc.constant"() {value = 42 : i32} : () -> i32
+  %2 = emitc.constant 42 : i32 -> i32
+  return
+}
+
+func.func @variable() {
+  %1 = "emitc.variable"() {value = 42 : i32} : () -> i32
+  %2 = emitc.variable 42 : i32 -> i32
   return
 }
 
@@ -123,7 +130,7 @@ func.func @test_if_else(%arg0: i1, %arg1: f32) {
 }
 
 func.func @test_assign(%arg1: f32) {
-  %v = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> f32
+  %v = emitc.variable #emitc.opaque<""> -> f32
   emitc.assign %arg1 : f32 to %v : f32
   return
 }

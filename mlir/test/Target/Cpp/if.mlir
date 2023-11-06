@@ -50,8 +50,8 @@ func.func @test_if_else(%arg0: i1, %arg1: f32) {
 
 func.func @test_if_yield(%arg0: i1, %arg1: f32) {
   %0 = arith.constant 0 : i8
-  %x = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
-  %y = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> f64
+  %x = emitc.variable #emitc.opaque<""> -> i32
+  %y = emitc.variable #emitc.opaque<""> -> f64
   emitc.if %arg0 {
     %1 = emitc.call "func_true_1"(%arg1) : (f32) -> i32
     %2 = emitc.call "func_true_2"(%arg1) : (f32) -> f64

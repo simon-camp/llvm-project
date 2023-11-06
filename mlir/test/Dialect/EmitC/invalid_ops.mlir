@@ -2,7 +2,7 @@
 
 func.func @const_attribute_return_type_1() {
     // expected-error @+1 {{'emitc.constant' op requires attribute's type ('i64') to match op's return type ('i32')}}
-    %c0 = "emitc.constant"(){value = 42: i64} : () -> i32
+    %c0 = emitc.constant 42: i64 -> i32
     return
 }
 
@@ -10,7 +10,7 @@ func.func @const_attribute_return_type_1() {
 
 func.func @const_attribute_return_type_2() {
     // expected-error @+1 {{'emitc.constant' op requires attribute's type ('!emitc.opaque<"char">') to match op's return type ('!emitc.opaque<"mychar">')}}
-    %c0 = "emitc.constant"(){value = "CHAR_MIN" : !emitc.opaque<"char">} : () -> !emitc.opaque<"mychar">
+    %c0 = emitc.constant "CHAR_MIN" : !emitc.opaque<"char"> -> !emitc.opaque<"mychar">
     return
 }
 
@@ -18,7 +18,7 @@ func.func @const_attribute_return_type_2() {
 
 func.func @empty_constant() {
     // expected-error @+1 {{'emitc.constant' op value must not be empty}}
-    %c0 = "emitc.constant"(){value = ""} : () -> i32
+    %c0 = emitc.constant "" -> i32
     return
 }
 
@@ -89,7 +89,7 @@ func.func @illegal_operator(%arg : i32) {
 // -----
 
 func.func @illegal_operand() {
-    %1 = "emitc.constant"(){value = 42: i32} : () -> i32
+    %1 = emitc.constant 42: i32 -> i32
     // expected-error @+1 {{'emitc.apply' op cannot apply to constant}}
     %2 = emitc.apply "&"(%1) : (i32) -> !emitc.ptr<i32>
     return
@@ -99,7 +99,7 @@ func.func @illegal_operand() {
 
 func.func @var_attribute_return_type_1() {
     // expected-error @+1 {{'emitc.variable' op requires attribute's type ('i64') to match op's return type ('i32')}}
-    %c0 = "emitc.variable"(){value = 42: i64} : () -> i32
+    %c0 = emitc.variable 42: i64 -> i32
     return
 }
 
@@ -107,7 +107,7 @@ func.func @var_attribute_return_type_1() {
 
 func.func @var_attribute_return_type_2() {
     // expected-error @+1 {{'emitc.variable' op requires attribute's type ('!emitc.ptr<i64>') to match op's return type ('!emitc.ptr<i32>')}}
-    %c0 = "emitc.variable"(){value = "nullptr" : !emitc.ptr<i64>} : () -> !emitc.ptr<i32>
+    %c0 = emitc.variable "nullptr" : !emitc.ptr<i64> -> !emitc.ptr<i32>
     return
 }
 
@@ -219,7 +219,7 @@ func.func @test_assign_to_non_variable(%arg1: f32, %arg2: f32) {
 // -----
 
 func.func @test_assign_type_mismatch(%arg1: f32) {
-  %v = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> i32
+  %v = emitc.variable #emitc.opaque<""> -> i32
   // expected-error @+1 {{'emitc.assign' op requires value's type ('f32') to match variable's type ('i32')}}
   emitc.assign %arg1 : f32 to %v : i32
   return
