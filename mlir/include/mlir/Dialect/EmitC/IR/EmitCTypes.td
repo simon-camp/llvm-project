@@ -26,6 +26,27 @@ class EmitC_Type<string name, string typeMnemonic>
   let mnemonic = typeMnemonic;
 }
 
+def EmitC_ArrayType : EmitC_Type<"Array", "array"> {
+  let summary = "EmitC array type";
+
+  let description = [{
+    An array data type.
+
+    Example:
+
+    ```mlir
+    // Array emitted as `int32_t VAR[1]`
+    !emitc.array<i32, 1>
+    // Pointer emitted as `float VAR[4]`
+    !emitc.array<f32, 4>
+    ```
+  }];
+
+  let parameters = (ins "Type":$elementType, "uint64_t":$size);
+  let assemblyFormat = "`<` qualified($elementType) `,` $size `>`";
+  let genVerifyDecl = 1;
+}
+
 def EmitC_OpaqueType : EmitC_Type<"Opaque", "opaque"> {
   let summary = "EmitC opaque type";
 
@@ -71,6 +92,7 @@ def EmitC_PointerType : EmitC_Type<"Pointer", "ptr"> {
     }]>
   ];
   let assemblyFormat = "`<` qualified($pointee) `>`";
+  let genVerifyDecl = 1;
 }
 
 #endif // MLIR_DIALECT_EMITC_IR_EMITCTYPES

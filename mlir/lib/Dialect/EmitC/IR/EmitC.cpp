@@ -763,6 +763,22 @@ LogicalResult emitc::YieldOp::verify() {
 #include "mlir/Dialect/EmitC/IR/EmitCTypes.cpp.inc"
 
 //===----------------------------------------------------------------------===//
+// ArrayType
+//===----------------------------------------------------------------------===//
+
+LogicalResult mlir::emitc::ArrayType::verify(
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
+    mlir::Type elementType, uint64_t size) {
+  if (llvm::isa<emitc::ArrayType>(elementType)) {
+    return emitError() << "nested arrays are not supported yet";
+  }
+  if (llvm::isa<emitc::PointerType>(elementType)) {
+    return emitError() << "arrays of pointers are not supported yet";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // OpaqueType
 //===----------------------------------------------------------------------===//
 
@@ -775,6 +791,19 @@ LogicalResult mlir::emitc::OpaqueType::verify(
   if (value.back() == '*') {
     return emitError() << "pointer not allowed as outer type with "
                           "!emitc.opaque, use !emitc.ptr instead";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// PointerType
+//===----------------------------------------------------------------------===//
+
+LogicalResult mlir::emitc::PointerType::verify(
+    llvm::function_ref<mlir::InFlightDiagnostic()> emitError,
+    mlir::Type pointee) {
+  if (llvm::isa<emitc::ArrayType>(pointee)) {
+    return emitError() << "pointers to arrays are not supported yet";
   }
   return success();
 }

@@ -24,6 +24,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/raw_ostream.h"
 #include <utility>
 
 #define DEBUG_TYPE "translate-to-cpp"
@@ -98,6 +99,29 @@ static FailureOr<int> getOperatorPrecedence(Operation *operation) {
 }
 
 namespace {
+
+struct Declaration {
+  Declaration() : prefix(prefixString), suffix(suffixString) {}
+
+  void emit(raw_ostream &os) { os << prefixString << suffixString; }
+
+  void emit(raw_ostream &os, StringRef declarator) {
+    if (prefixString.back() == '(' and suffixString.front() == ')') {
+      os << prefixString.substr(0, prefixString.size() - 1) << " " << declarator
+         << suffixString.substr(1, suffixString.size());
+      return;
+    }
+    os << prefixString << " " << declarator << suffixString;
+  }
+
+  llvm::raw_string_ostream prefix;
+  llvm::raw_string_ostream suffix;
+
+private:
+  std::string prefixString;
+  std::string suffixString;
+};
+
 /// Emitter that uses dialect specific emitters to emit C++ code.
 struct CppEmitter {
   explicit CppEmitter(raw_ostream &os, bool declareVariablesAtTop);
@@ -107,6 +131,10 @@ struct CppEmitter {
 
   /// Emits operation 'op' with/without training semicolon or returns failure.
   LogicalResult emitOperation(Operation &op, bool trailingSemicolon);
+
+  /// Build a declaration for a given type.
+  LogicalResult buildTypeDeclaration(Location loc, Type type,
+                                     Declaration &decl);
 
   /// Emits type 'type' or returns failure.
   LogicalResult emitType(Location loc, Type type);
@@ -125,8 +153,7 @@ struct CppEmitter {
   LogicalResult emitVariableAssignment(OpResult result);
 
   /// Emits a variable declaration for a result of an operation.
-  LogicalResult emitVariableDeclaration(OpResult result,
-                                        bool trailingSemicolon);
+  LogicalResult emitVariableDeclaration(Value result, bool trailingSemicolon);
 
   /// Emits the variable declaration and assignment prefix for 'op'.
   /// - emits separate variable followed by std::tie for multi-valued operation;
@@ -791,10 +818,7 @@ static LogicalResult printFunctionArgs(CppEmitter &emitter,
 
   return (interleaveCommaWithError(
       arguments, os, [&](BlockArgument arg) -> LogicalResult {
-        if (failed(emitter.emitType(functionOp->getLoc(), arg.getType())))
-          return failure();
-        os << " " << emitter.getOrCreateName(arg);
-        return success();
+        return emitter.emitVariableDeclaration(arg, false);
       }));
 }
 
@@ -838,11 +862,9 @@ static LogicalResult printFunctionBody(CppEmitter &emitter,
       if (emitter.hasValueInScope(arg))
         return functionOp->emitOpError(" block argument #")
                << arg.getArgNumber() << " is out of scope";
-      if (failed(
-              emitter.emitType(block.getParentOp()->getLoc(), arg.getType()))) {
+      if (failed(emitter.emitVariableDeclaration(arg, true))) {
         return failure();
       }
-      os << " " << emitter.getOrCreateName(arg) << ";\n";
     }
   }
 
@@ -1221,15 +1243,17 @@ LogicalResult CppEmitter::emitVariableAssignment(OpResult result) {
   return success();
 }
 
-LogicalResult CppEmitter::emitVariableDeclaration(OpResult result,
+LogicalResult CppEmitter::emitVariableDeclaration(Value result,
                                                   bool trailingSemicolon) {
   if (hasValueInScope(result)) {
     return result.getDefiningOp()->emitError(
         "result variable for the operation already declared");
   }
-  if (failed(emitType(result.getOwner()->getLoc(), result.getType())))
+
+  Declaration decl;
+  if (failed(buildTypeDeclaration(result.getLoc(), result.getType(), decl)))
     return failure();
-  os << " " << getOrCreateName(result);
+  decl.emit(os, getOrCreateName(result));
   if (trailingSemicolon)
     os << ";\n";
   return success();
@@ -1323,18 +1347,30 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
 }
 
 LogicalResult CppEmitter::emitType(Location loc, Type type) {
+  Declaration decl;
+  if (failed(buildTypeDeclaration(loc, type, decl)))
+    return failure();
+
+  decl.emit(os);
+  return success();
+}
+
+LogicalResult CppEmitter::buildTypeDeclaration(Location loc, Type type,
+                                               Declaration &decl) {
+  auto &prefix = decl.prefix;
+  auto &suffix = decl.suffix;
   if (auto iType = dyn_cast<IntegerType>(type)) {
     switch (iType.getWidth()) {
     case 1:
-      return (os << "bool"), success();
+      return (prefix << "bool"), success();
     case 8:
     case 16:
     case 32:
     case 64:
       if (shouldMapToUnsigned(iType.getSignedness()))
-        return (os << "uint" << iType.getWidth() << "_t"), success();
+        return (prefix << "uint" << iType.getWidth() << "_t"), success();
       else
-        return (os << "int" << iType.getWidth() << "_t"), success();
+        return (prefix << "int" << iType.getWidth() << "_t"), success();
     default:
       return emitError(loc, "cannot emit integer type ") << type;
     }
@@ -1342,41 +1378,48 @@ LogicalResult CppEmitter::emitType(Location loc, Type type) {
   if (auto fType = dyn_cast<FloatType>(type)) {
     switch (fType.getWidth()) {
     case 32:
-      return (os << "float"), success();
+      return (prefix << "float"), success();
     case 64:
-      return (os << "double"), success();
+      return (prefix << "double"), success();
     default:
       return emitError(loc, "cannot emit float type ") << type;
     }
   }
   if (auto iType = dyn_cast<IndexType>(type))
-    return (os << "size_t"), success();
+    return (prefix << "size_t"), success();
   if (auto tType = dyn_cast<TensorType>(type)) {
     if (!tType.hasRank())
       return emitError(loc, "cannot emit unranked tensor type");
     if (!tType.hasStaticShape())
       return emitError(loc, "cannot emit tensor type with non static shape");
-    os << "Tensor<";
-    if (failed(emitType(loc, tType.getElementType())))
+    prefix << "Tensor<";
+    if (failed(buildTypeDeclaration(loc, tType.getElementType(), decl)))
       return failure();
     auto shape = tType.getShape();
     for (auto dimSize : shape) {
-      os << ", ";
-      os << dimSize;
+      prefix << ", ";
+      prefix << dimSize;
     }
-    os << ">";
+    prefix << ">";
     return success();
   }
   if (auto tType = dyn_cast<TupleType>(type))
     return emitTupleType(loc, tType.getTypes());
+  if (auto aType = dyn_cast<emitc::ArrayType>(type)) {
+    if (failed(buildTypeDeclaration(loc, aType.getElementType(), decl)))
+      return failure();
+    prefix << "(";
+    suffix << ")[" << aType.getSize() << "]";
+    return success();
+  }
   if (auto oType = dyn_cast<emitc::OpaqueType>(type)) {
-    os << oType.getValue();
+    prefix << oType.getValue();
     return success();
   }
   if (auto pType = dyn_cast<emitc::PointerType>(type)) {
-    if (failed(emitType(loc, pType.getPointee())))
+    if (failed(buildTypeDeclaration(loc, pType.getPointee(), decl)))
       return failure();
-    os << "*";
+    prefix << "*";
     return success();
   }
   return emitError(loc, "cannot emit type ") << type;
