@@ -297,35 +297,37 @@ static bool shouldBeInlined(ExpressionOp expressionOp) {
 }
 
 static LogicalResult printConstantOp(CppEmitter &emitter, Operation *operation,
-                                     Attribute value) {
+                                     std::optional<Attribute> value) {
   OpResult result = operation->getResult(0);
+
+  bool noInitializer = !value.has_value() ||
+                       (isa<emitc::OpaqueAttr>(*value) &&
+                        cast<emitc::OpaqueAttr>(*value).getValue().empty());
 
   // Only emit an assignment as the variable was already declared when printing
   // the FuncOp.
   if (emitter.shouldDeclareVariablesAtTop()) {
-    // Skip the assignment if the emitc.constant has no value.
-    if (auto oAttr = dyn_cast<emitc::OpaqueAttr>(value)) {
-      if (oAttr.getValue().empty())
-        return success();
+    // Skip the assignment if the op has no initializer.
+    if (noInitializer) {
+      return success();
     }
 
     if (failed(emitter.emitVariableAssignment(result)))
       return failure();
-    return emitter.emitAttribute(operation->getLoc(), value);
+    return emitter.emitAttribute(operation->getLoc(), *value);
   }
 
-  // Emit a variable declaration for an emitc.constant op without value.
-  if (auto oAttr = dyn_cast<emitc::OpaqueAttr>(value)) {
-    if (oAttr.getValue().empty())
-      // The semicolon gets printed by the emitOperation function.
-      return emitter.emitVariableDeclaration(result,
-                                             /*trailingSemicolon=*/false);
+  // Emit a variable declaration for an op without initializer.
+  if (noInitializer) {
+    // The semicolon gets printed by the emitOperation function.
+    return emitter.emitVariableDeclaration(result,
+                                           /*trailingSemicolon=*/false);
   }
 
   // Emit a variable declaration.
   if (failed(emitter.emitAssignPrefix(*operation)))
     return failure();
-  return emitter.emitAttribute(operation->getLoc(), value);
+  return emitter.emitAttribute(operation->getLoc(), *value);
 }
 
 static LogicalResult printOperation(CppEmitter &emitter,
@@ -339,7 +341,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
 static LogicalResult printOperation(CppEmitter &emitter,
                                     emitc::VariableOp variableOp) {
   Operation *operation = variableOp.getOperation();
-  Attribute value = variableOp.getValue();
+  std::optional<Attribute> value = variableOp.getValue();
 
   return printConstantOp(emitter, operation, value);
 }

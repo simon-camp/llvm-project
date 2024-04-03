@@ -170,7 +170,7 @@ func.func @test_if_else(%arg0: i1, %arg1: f32) {
 }
 
 func.func @test_assign(%arg1: f32) {
-  %v = emitc.variable(#emitc.opaque<"">) : f32
+  %v = emitc.variable noinit : f32
   emitc.assign %arg1 : f32 to %v : f32
   return
 }

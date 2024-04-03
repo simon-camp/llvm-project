@@ -760,7 +760,12 @@ LogicalResult SubOp::verify() {
 //===----------------------------------------------------------------------===//
 
 LogicalResult emitc::VariableOp::verify() {
-  return verifyInitializationAttribute(getOperation(), getValueAttr());
+  std::optional<Attribute> value = getValue();
+  
+  if (!value.has_value())
+    return success();
+  
+  return verifyInitializationAttribute(getOperation(), *value);
 }
 
 //===----------------------------------------------------------------------===//

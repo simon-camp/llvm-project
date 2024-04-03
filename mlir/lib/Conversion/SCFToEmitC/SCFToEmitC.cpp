@@ -63,9 +63,7 @@ static SmallVector<Value> createVariablesForResults(T op,
 
   for (OpResult result : op.getResults()) {
     Type resultType = result.getType();
-    emitc::OpaqueAttr noInit = emitc::OpaqueAttr::get(context, "");
-    emitc::VariableOp var =
-        rewriter.create<emitc::VariableOp>(loc, resultType, noInit);
+    emitc::VariableOp var = rewriter.create<emitc::VariableOp>(loc, resultType);
     resultVariables.push_back(var);
   }
 

@@ -40,10 +40,10 @@ func.func @test_for_yield() {
   %s0 = emitc.constant(0 : i32) : i32
   %p0 = emitc.constant(1.0 : f32) : f32
 
-  %0 = emitc.variable(#emitc.opaque<"">) : i32
-  %1 = emitc.variable(#emitc.opaque<"">) : f32
-  %2 = emitc.variable(#emitc.opaque<"">) : i32
-  %3 = emitc.variable(#emitc.opaque<"">) : f32
+  %0 = emitc.variable noinit : i32
+  %1 = emitc.variable noinit : f32
+  %2 = emitc.variable noinit : i32
+  %3 = emitc.variable noinit : f32
   emitc.assign %s0 : i32 to %2 : i32
   emitc.assign %p0 : f32 to %3 : f32
   emitc.for %iter = %start to %stop step %step {
@@ -121,10 +121,10 @@ func.func @test_for_yield_2() {
   %s0 = emitc.literal "0" : i32
   %p0 = emitc.literal "M_PI" : f32
 
-  %0 = emitc.variable(#emitc.opaque<"">) : i32
-  %1 = emitc.variable(#emitc.opaque<"">) : f32
-  %2 = emitc.variable(#emitc.opaque<"">) : i32
-  %3 = emitc.variable(#emitc.opaque<"">) : f32
+  %0 = emitc.variable noinit : i32
+  %1 = emitc.variable noinit : f32
+  %2 = emitc.variable noinit : i32
+  %3 = emitc.variable noinit : f32
   emitc.assign %s0 : i32 to %2 : i32
   emitc.assign %p0 : f32 to %3 : f32
   emitc.for %iter = %start to %stop step %step {

@@ -994,6 +994,9 @@ def EmitC_VariableOp : EmitC_Op<"variable", []> {
     // Variable emitted as `int32_t* p = NULL;`
     %1 = emitc.variable(#emitc.opaque<"NULL">)
       : !emitc.ptr<!emitc.opaque<"int32_t">>
+
+    // Uninitialized variable
+    %2 = emitc.variable noinit : !emitc.opaque<"int">
     ```
 
     Since folding is not supported, it can be used with pointers.
@@ -1009,11 +1012,16 @@ def EmitC_VariableOp : EmitC_Op<"variable", []> {
     ```
   }];
 
-  let arguments = (ins EmitC_OpaqueOrTypedAttr:$value);
+  let arguments = (ins OptionalAttr<EmitC_OpaqueOrTypedAttr>:$value);
   let results = (outs AnyType);
 
-  let assemblyFormat = "`(` $value `)` attr-dict `:` type(results)";
+  let assemblyFormat = "(`(` $value^ `)`):(`noinit`)? attr-dict `:` type(results)";
   let hasVerifier = 1;
+
+  let builders = [
+    OpBuilder<(ins "Type":$type), [{
+      build($_builder, $_state, type, nullptr);
+    }]>];
 }
 
 def EmitC_VerbatimOp : EmitC_Op<"verbatim"> {
