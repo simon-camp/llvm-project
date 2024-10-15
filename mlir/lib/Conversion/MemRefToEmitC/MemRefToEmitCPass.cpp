@@ -13,7 +13,9 @@
 #include "mlir/Conversion/MemRefToEmitC/MemRefToEmitCPass.h"
 
 #include "mlir/Conversion/MemRefToEmitC/MemRefToEmitC.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/EmitC/Transforms/TypeConversions.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -38,7 +40,20 @@ struct ConvertMemRefToEmitCPass
       return {};
     });
 
-    populateMemRefToEmitCTypeConversion(converter);
+    populateMemRefToEmitCTypeConversions(converter, /*convertZeroRank=*/true);
+
+    auto materializeAsUnrealizedCast =
+        [](OpBuilder &builder, Type resultType, ValueRange inputs,
+           Location loc) -> std::optional<Value> {
+      if (inputs.size() != 1)
+        return std::nullopt;
+
+      return builder.create<UnrealizedConversionCastOp>(loc, resultType, inputs)
+          .getResult(0);
+    };
+
+    converter.addSourceMaterialization(materializeAsUnrealizedCast);
+    converter.addTargetMaterialization(materializeAsUnrealizedCast);
 
     RewritePatternSet patterns(&getContext());
     populateMemRefToEmitCConversionPatterns(patterns, converter);
@@ -46,6 +61,7 @@ struct ConvertMemRefToEmitCPass
     ConversionTarget target(getContext());
     target.addIllegalDialect<memref::MemRefDialect>();
     target.addLegalDialect<emitc::EmitCDialect>();
+    target.addLegalOp<arith::ConstantOp>();
 
     if (failed(applyPartialConversion(getOperation(), target,
                                       std::move(patterns))))

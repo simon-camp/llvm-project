@@ -15,6 +15,8 @@ namespace mlir {
 class TypeConverter;
 class Type;
 void populateEmitCSizeTTypeConversions(TypeConverter &converter);
+void populateMemRefToEmitCTypeConversions(TypeConverter &typeConverter,
+                                          bool convertZeroRank);
 
 namespace emitc {
 std::optional<Type> getUnsignedTypeFor(Type ty);

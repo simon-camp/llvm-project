@@ -1,5 +1,23 @@
 // RUN: mlir-opt -convert-memref-to-emitc %s -split-input-file | FileCheck %s
 
+// CHECK-LABEL: alloca()
+func.func @alloca() {
+  // CHECK-NEXT: %[[ALLOCA:.*]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.array<2xf32>
+  %0 = memref.alloca() : memref<2xf32>
+  return
+}
+
+// -----
+
+// CHECK-LABEL: alloca_zero_rank()
+func.func @alloca_zero_rank() {
+  // CHECK-NEXT: %[[ALLOCA:.*]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.array<1xf32>
+  %0 = memref.alloca() : memref<f32>
+  return
+}
+
+// -----
+
 // CHECK-LABEL: memref_store
 // CHECK-SAME:  %[[v:.*]]: f32, %[[i:.*]]: index, %[[j:.*]]: index
 func.func @memref_store(%v : f32, %i: index, %j: index) {

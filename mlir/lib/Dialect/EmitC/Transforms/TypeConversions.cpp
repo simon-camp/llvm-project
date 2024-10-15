@@ -10,7 +10,11 @@
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/Debug.h"
+
 #include <optional>
+
+#define DEBUG_TYPE "mlir-emitc-conversion"
 
 using namespace mlir;
 
@@ -61,4 +65,36 @@ std::optional<Type> mlir::emitc::getSignedTypeFor(Type ty) {
   if (isa<PtrDiffTType>(ty))
     return ty;
   return {};
+}
+
+void mlir::populateMemRefToEmitCTypeConversions(TypeConverter &typeConverter,
+                                                bool convertZeroRank) {
+  typeConverter.addConversion([&, convertZeroRank](MemRefType memRefType)
+                                  -> std::optional<Type> {
+    if (!memRefType.hasStaticShape()) {
+      LLVM_DEBUG(llvm::dbgs() << "Memref type must have static shape\n");
+      return {};
+    }
+    if (!memRefType.getLayout().isIdentity()) {
+      LLVM_DEBUG(llvm::dbgs() << "Memref type must have identity layout map\n");
+      return {};
+    }
+    if (llvm::any_of(memRefType.getShape(),
+                     [](int64_t dim) { return dim == 0; })) {
+      LLVM_DEBUG(llvm::dbgs() << "Memref type must not have 0 dims\n");
+      return {};
+    }
+    Type convertedElementType =
+        typeConverter.convertType(memRefType.getElementType());
+    if (!convertedElementType) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to convert element type\n");
+      return {};
+    }
+    if (memRefType.getRank() == 0) {
+      if (convertZeroRank)
+        return emitc::ArrayType::get({1}, convertedElementType);
+      return {};
+    }
+    return emitc::ArrayType::get(memRefType.getShape(), convertedElementType);
+  });
 }

@@ -12,7 +12,9 @@ add_mlir_conversion_library(MLIRMemRefToEmitC
   Core
 
   LINK_LIBS PUBLIC
+  MLIRArithDialect
   MLIREmitCDialect
+  MLIREmitCTransforms
   MLIRMemRefDialect
   MLIRTransforms
   )
