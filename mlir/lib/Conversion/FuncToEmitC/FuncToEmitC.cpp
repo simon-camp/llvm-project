@@ -36,9 +36,17 @@ public:
       return rewriter.notifyMatchFailure(
           callOp, "only functions with zero or one result can be converted");
 
-    rewriter.replaceOpWithNewOp<emitc::CallOp>(callOp, callOp.getResultTypes(),
-                                               adaptor.getOperands(),
-                                               callOp->getAttrs());
+    if (callOp.getNumResults() == 1) {
+      auto resultType =
+          getTypeConverter()->convertType(callOp.getResult(0).getType());
+      if (!resultType)
+        return failure();
+      rewriter.replaceOpWithNewOp<emitc::CallOp>(
+          callOp, resultType, adaptor.getOperands(), callOp->getAttrs());
+    } else {
+      rewriter.replaceOpWithNewOp<emitc::CallOp>(
+          callOp, TypeRange(), adaptor.getOperands(), callOp->getAttrs());
+    }
 
     return success();
   }
@@ -51,14 +59,33 @@ public:
   LogicalResult
   matchAndRewrite(func::FuncOp funcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-
-    if (funcOp.getFunctionType().getNumResults() > 1)
+    FunctionType fnType = funcOp.getFunctionType();
+    if (fnType.getNumResults() > 1)
       return rewriter.notifyMatchFailure(
           funcOp, "only functions with zero or one result can be converted");
 
+    TypeConverter::SignatureConversion signatureConverter(
+        fnType.getNumInputs());
+    for (const auto &argType : enumerate(fnType.getInputs())) {
+      auto convertedType = getTypeConverter()->convertType(argType.value());
+      if (!convertedType)
+        return failure();
+      signatureConverter.addInputs(argType.index(), convertedType);
+    }
+
+    Type resultType;
+    if (fnType.getNumResults() == 1) {
+      resultType = getTypeConverter()->convertType(fnType.getResult(0));
+      if (!resultType)
+        return failure();
+    }
+
     // Create the converted `emitc.func` op.
     emitc::FuncOp newFuncOp = rewriter.create<emitc::FuncOp>(
-        funcOp.getLoc(), funcOp.getName(), funcOp.getFunctionType());
+        funcOp.getLoc(), funcOp.getName(),
+        rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
+                                 resultType ? TypeRange(resultType)
+                                            : TypeRange()));
 
     // Copy over all attributes other than the function name and type.
     for (const auto &namedAttr : funcOp->getAttrs()) {
@@ -80,9 +107,14 @@ public:
       newFuncOp.setSpecifiersAttr(specifiers);
     }
 
-    if (!funcOp.isDeclaration())
+    if (!funcOp.isDeclaration()) {
+
       rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
                                   newFuncOp.end());
+      if (failed(rewriter.convertRegionTypes(
+              &newFuncOp.getBody(), *getTypeConverter(), &signatureConverter)))
+        return failure();
+    }
     rewriter.eraseOp(funcOp);
 
     return success();
@@ -112,8 +144,10 @@ public:
 // Pattern population
 //===----------------------------------------------------------------------===//
 
-void mlir::populateFuncToEmitCPatterns(RewritePatternSet &patterns) {
+void mlir::populateFuncToEmitCPatterns(RewritePatternSet &patterns,
+                                       const TypeConverter &converter) {
   MLIRContext *ctx = patterns.getContext();
 
-  patterns.add<CallOpConversion, FuncOpConversion, ReturnOpConversion>(ctx);
+  patterns.add<CallOpConversion, FuncOpConversion, ReturnOpConversion>(
+      converter, ctx);
 }

@@ -10,7 +10,13 @@
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/Support/Debug.h"
+
 #include <optional>
+
+#define DEBUG_TYPE "mlir-emitc-conversion"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 using namespace mlir;
 
@@ -34,6 +40,44 @@ void mlir::populateEmitCSizeTTypeConversions(TypeConverter &converter) {
   converter.addSourceMaterialization(materializeAsUnrealizedCast);
   converter.addTargetMaterialization(materializeAsUnrealizedCast);
   converter.addArgumentMaterialization(materializeAsUnrealizedCast);
+}
+
+void mlir::populateMemRefToEmitCTypeConversions(
+    TypeConverter &typeConverter, const EmitCConversionOptions &options) {
+  typeConverter.addConversion(
+      [&](MemRefType memRefType) -> std::optional<Type> {
+        if (!options.memrefToArray) {
+          LDBG("Memref type conversion not enabled\n");
+          return {};
+        }
+        if (!memRefType.hasStaticShape()) {
+          LDBG("Memref type must have static shape\n");
+          return {};
+        }
+        if (!memRefType.getLayout().isIdentity()) {
+          LDBG("Memref type must have identity layout map\n");
+          return {};
+        }
+        if (llvm::any_of(memRefType.getShape(),
+                         [](int64_t dim) { return dim == 0; })) {
+          LDBG("Memref type must not have 0 dims\n");
+          return {};
+        }
+        Type convertedElementType =
+            typeConverter.convertType(memRefType.getElementType());
+        if (!convertedElementType) {
+          LDBG("Failed to convert element type\n");
+          return {};
+        }
+        if (memRefType.getRank() == 0) {
+          if (options.promote0dMemref)
+            return emitc::ArrayType::get({1}, convertedElementType);
+          LDBG("Rank 0 promotion not enabled\n");
+          return {};
+        }
+        return emitc::ArrayType::get(memRefType.getShape(),
+                                     convertedElementType);
+      });
 }
 
 /// Get an unsigned integer or size data type corresponding to \p ty.

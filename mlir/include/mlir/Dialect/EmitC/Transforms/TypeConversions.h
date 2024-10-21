@@ -14,7 +14,19 @@
 namespace mlir {
 class TypeConverter;
 class Type;
+
+struct EmitCConversionOptions {
+  /// Convert statically shaped memref types to emitc array types.
+  bool memrefToArray = false;
+
+  /// Promote 0-d memrefs to 1-d arrays of size 1. This option can only be used
+  /// in conjunction with `memrefToArray`.
+  bool promote0dMemref = false;
+};
+
 void populateEmitCSizeTTypeConversions(TypeConverter &converter);
+void populateMemRefToEmitCTypeConversions(
+    TypeConverter &typeConverter, const EmitCConversionOptions &options);
 
 namespace emitc {
 std::optional<Type> getUnsignedTypeFor(Type ty);

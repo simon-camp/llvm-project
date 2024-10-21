@@ -13,7 +13,9 @@
 #include "mlir/Conversion/MemRefToEmitC/MemRefToEmitCPass.h"
 
 #include "mlir/Conversion/MemRefToEmitC/MemRefToEmitC.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/EmitC/Transforms/TypeConversions.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -38,7 +40,24 @@ struct ConvertMemRefToEmitCPass
       return {};
     });
 
-    populateMemRefToEmitCTypeConversion(converter);
+    EmitCConversionOptions opt;
+    opt.memrefToArray = true;
+    opt.promote0dMemref = true;
+
+    populateMemRefToEmitCTypeConversions(converter, /*options=*/opt);
+
+    auto materializeAsUnrealizedCast =
+        [](OpBuilder &builder, Type resultType, ValueRange inputs,
+           Location loc) -> Value {
+      if (inputs.size() != 1)
+        return Value();
+
+      return builder.create<UnrealizedConversionCastOp>(loc, resultType, inputs)
+          .getResult(0);
+    };
+
+    converter.addSourceMaterialization(materializeAsUnrealizedCast);
+    converter.addTargetMaterialization(materializeAsUnrealizedCast);
 
     RewritePatternSet patterns(&getContext());
     populateMemRefToEmitCConversionPatterns(patterns, converter);

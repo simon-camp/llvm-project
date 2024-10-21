@@ -134,8 +134,17 @@ struct ConvertLoad final : public OpConversionPattern<memref::LoadOp> {
       return rewriter.notifyMatchFailure(op.getLoc(), "expected array type");
     }
 
-    auto subscript = rewriter.create<emitc::SubscriptOp>(
-        op.getLoc(), arrayValue, operands.getIndices());
+    const bool isRankeZero = op.getMemRefType().getRank() == 0;
+    Value zeroIndex;
+    if (isRankeZero)
+      zeroIndex = rewriter.create<emitc::ConstantOp>(
+          op.getLoc(), rewriter.getIndexType(), rewriter.getIndexAttr(0));
+
+    ValueRange indices =
+        isRankeZero ? ValueRange{zeroIndex} : operands.getIndices();
+
+    auto subscript =
+        rewriter.create<emitc::SubscriptOp>(op.getLoc(), arrayValue, indices);
 
     rewriter.replaceOpWithNewOp<emitc::LoadOp>(op, resultTy, subscript);
     return success();
@@ -154,32 +163,23 @@ struct ConvertStore final : public OpConversionPattern<memref::StoreOp> {
       return rewriter.notifyMatchFailure(op.getLoc(), "expected array type");
     }
 
-    auto subscript = rewriter.create<emitc::SubscriptOp>(
-        op.getLoc(), arrayValue, operands.getIndices());
+    const bool isRankeZero = op.getMemRefType().getRank() == 0;
+    Value zeroIndex;
+    if (isRankeZero)
+      zeroIndex = rewriter.create<emitc::ConstantOp>(
+          op.getLoc(), rewriter.getIndexType(), rewriter.getIndexAttr(0));
+
+    ValueRange indices =
+        isRankeZero ? ValueRange{zeroIndex} : operands.getIndices();
+
+    auto subscript =
+        rewriter.create<emitc::SubscriptOp>(op.getLoc(), arrayValue, indices);
     rewriter.replaceOpWithNewOp<emitc::AssignOp>(op, subscript,
                                                  operands.getValue());
     return success();
   }
 };
 } // namespace
-
-void mlir::populateMemRefToEmitCTypeConversion(TypeConverter &typeConverter) {
-  typeConverter.addConversion(
-      [&](MemRefType memRefType) -> std::optional<Type> {
-        if (!memRefType.hasStaticShape() ||
-            !memRefType.getLayout().isIdentity() || memRefType.getRank() == 0 ||
-            llvm::any_of(memRefType.getShape(),
-                         [](int64_t dim) { return dim == 0; })) {
-          return {};
-        }
-        Type convertedElementType =
-            typeConverter.convertType(memRefType.getElementType());
-        if (!convertedElementType)
-          return {};
-        return emitc::ArrayType::get(memRefType.getShape(),
-                                     convertedElementType);
-      });
-}
 
 void mlir::populateMemRefToEmitCConversionPatterns(
     RewritePatternSet &patterns, const TypeConverter &converter) {
